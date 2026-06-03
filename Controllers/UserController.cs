@@ -76,14 +76,31 @@ namespace E_Commerce_System_API.Controllers
 
         // function to Get user details
         [HttpGet("UserInformation")]
-        public IActionResult UserInformation(int userId)
+        public IActionResult UserInformation()
         {
-            var user = context.Users.FirstOrDefault(u => u.UId == userId);
+            int? userId = HttpContext.Session.GetInt32("UserId");
+
+            if (userId == null)
+            {
+                return NotFound("You should login frist!");
+            }
+
+            var user = context.Users.Find(userId);
             if (user == null)
             {
                 return NotFound("User not found.");
             }
-            return Ok(user);
+
+            var GetUserInfoDTO = new GetUserInfoDTO
+            {
+                UId = user.UId,
+                UName = user.UName,
+                Email = user.Email,
+                Phone = user.Phone,
+                CreatedAt = user.CreatedAt
+            };
+
+            return Ok(GetUserInfoDTO);
         }
 
         // function to Deactivate User
