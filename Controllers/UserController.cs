@@ -103,10 +103,81 @@ namespace E_Commerce_System_API.Controllers
             return Ok(GetUserInfoDTO);
         }
 
+        [HttpGet("GetAllUsers")]
+        public IActionResult GetAllUsers()
+        {
+            int? userId = HttpContext.Session.GetInt32("UserId");
+            string role = HttpContext.Session.GetString("Role");
+
+            // check login
+            if (userId == null)
+            {
+                return Unauthorized("Please login first.");
+            }
+
+            // check user exists
+            var user = context.Users.Find(userId);
+
+            if (user == null)
+            {
+                return Unauthorized("User not found.");
+            }
+
+            // check admin role
+            if (role != "Admin")
+            {
+                return Forbid("You do not have permission to perform this action.");
+            }
+
+            // get all users
+            var users = context.Users.ToList();
+
+            // convert to DTO
+            var usersDTO = new List<GetUserInfoDTO>();
+
+            // loop to convert each user to DTO
+            foreach (var u in users)
+            {
+                usersDTO.Add(new GetUserInfoDTO
+                {
+                    UId = u.UId,
+                    UName = u.UName,
+                    Email = u.Email,
+                    Phone = u.Phone,
+                    CreatedAt = u.CreatedAt
+                });
+            }
+
+            return Ok(usersDTO);
+
+        }
+
         // function to Deactivate User
         [HttpPut("DeactivateUser")]
         public IActionResult DeactivateUser(int userID, bool status)
         {
+            int? userId = HttpContext.Session.GetInt32("UserId");
+            string role = HttpContext.Session.GetString("Role");
+
+            // check login
+            if (userId == null)
+            {
+                return Unauthorized("Please login first.");
+            }
+
+            // check user exists
+            var user = context.Users.Find(userId);
+            if (user == null)
+            {
+                return Unauthorized("User not found.");
+            }
+
+            // check admin role
+            if (role != "Admin")
+            {
+                return Forbid("You do not have permission to perform this action.");
+            }
+
             var users = context.Users.FirstOrDefault(a => a.UId == userID);
 
             if (users != null)
