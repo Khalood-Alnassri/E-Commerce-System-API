@@ -1,0 +1,122 @@
+﻿using E_Commerce_System;
+using E_Commerce_System_API.DTOs;
+using E_Commerce_System_API.Models;
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using System.Linq;
+using System.Net.NetworkInformation;
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace E_Commerce_System_API.Controllers
+{
+    [ApiController]
+    [Route("api/User")]
+    public class UserController : ControllerBase
+    {
+        ApplicationDbContext context = new ApplicationDbContext();
+
+        // function to regist user (add user)
+        [HttpPost("Register")]
+        public IActionResult Register(UserRegisterDTO registerDto)
+        {
+            User user = new User();
+
+            user.UName = registerDto.UName;
+            user.Email = registerDto.Email;
+            user.Password = HashPassword(registerDto.Password);
+            user.Phone = registerDto.Phone;
+            user.CreatedAt = DateTime.Now;  
+            user.Role = "User";
+            user.IsActive = true;
+
+            context.Users.Add(user);
+            context.SaveChanges();
+            return Ok("Register successfully, with ID: " + user.UId);
+        }
+
+        // function to login
+        [HttpGet("Login")]
+        public IActionResult Login(string email, string password)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest("Email is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                return BadRequest("Password is required.");
+            }
+
+            var user = context.Users.FirstOrDefault(u => u.Email.ToLower() == email.ToLower());
+
+            string hashedPassword = HashPassword(password);
+
+            if (user == null || user.Password != hashedPassword)
+            {
+                return BadRequest("Invalid email or password.");
+            }
+
+            if (!user.IsActive)
+            {
+                return BadRequest("Your account is inactive.");
+            }
+
+            // save user id and user role in session
+            HttpContext.Session.SetInt32("UserId", user.UId);
+            HttpContext.Session.SetString("Role", user.Role);
+
+            return Ok( new {
+                Message = "Login successful",
+                UserId = user.UId,
+                Role = user.Role } );
+        }
+
+        // function to Get user details
+        [HttpGet("UserInformation")]
+        public IActionResult UserInformation(int userId)
+        {
+            var user = context.Users.FirstOrDefault(u => u.UId == userId);
+            if (user == null)
+            {
+                return NotFound("User not found.");
+            }
+            return Ok(user);
+        }
+
+        // function to Deactivate User
+        [HttpPut("DeactivateUser")]
+        public IActionResult DeactivateUser(int userID, bool status)
+        {
+            var users = context.Users.FirstOrDefault(a => a.UId == userID);
+
+            if (users != null)
+            {
+                users.IsActive = status;
+                context.SaveChanges();
+                return Ok("User status updated successfully.");
+            }
+            return NotFound("User not found.");
+        }
+
+        // function helper to hash password
+        public static string HashPassword(string password)
+        {
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+
+                StringBuilder builder = new StringBuilder();
+
+                foreach (byte b in bytes)
+                {
+                    builder.Append(b.ToString("x2"));
+                }
+
+                return builder.ToString();
+            }
+        }
+    }
+}
