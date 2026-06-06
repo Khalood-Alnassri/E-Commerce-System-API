@@ -30,7 +30,7 @@ namespace E_Commerce_System_API.Controllers
 
             user.UName = registerDto.UName;
             user.Email = registerDto.Email;
-            user.Password = HashPassword(registerDto.Password);
+            user.Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
             user.Phone = registerDto.Phone;
             user.CreatedAt = DateTime.Now;  
             user.Role = "User";
@@ -43,23 +43,11 @@ namespace E_Commerce_System_API.Controllers
 
         // function to login
         [HttpGet("Login")]
-        public IActionResult Login(string email, string password)
+        public IActionResult Login(UserLoginDTO loginDTO)
         {
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                return BadRequest("Email is required.");
-            }
+            var user = _context.Users.FirstOrDefault(u => u.Email.ToLower() == loginDTO.Email.ToLower());
 
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                return BadRequest("Password is required.");
-            }
-
-            var user = _context.Users.FirstOrDefault(u => u.Email.ToLower() == email.ToLower());
-
-            string hashedPassword = HashPassword(password);
-
-            if (user == null || user.Password != hashedPassword)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(loginDTO.Password, user.Password))
             {
                 return BadRequest("Invalid email or password.");
             }
