@@ -2,20 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 using E_Commerce_System_API.Models;
 
 namespace E_Commerce_System
 {
-    internal class ApplicationDbContext : DbContext
+    public class ApplicationDbContext : DbContext
     {
-        internal object user;
-
-        protected override void OnConfiguring(DbContextOptionsBuilder options)
-        {
-            //connection t database
-            options.UseSqlServer(" Data Source=(localdb)\\MSSQLLocalDB; Initial Catalog=E_Commerce_System_API; Integrated Security=true; TrustServerCertificate=True ");
-        }
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+           : base(options) { }
 
         // register the models 
 

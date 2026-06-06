@@ -8,7 +8,12 @@ namespace E_Commerce_System_API.Controllers
     [Route("api/Review")]
     public class ReviewController : ControllerBase
     {
-        ApplicationDbContext context = new ApplicationDbContext();
+        public ApplicationDbContext _context;
+
+        public ReviewController (ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         // function to update review
         [HttpPut("UpdateReview")]
@@ -22,7 +27,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // search all reviews for the user 
-            var myReviews = context.Reviews.Where(r => r.UId == userId).ToList();
+            var myReviews = _context.Reviews.Where(r => r.UId == userId).ToList();
 
             if (!myReviews.Any())
             {
@@ -30,7 +35,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // take review id from the user
-            var review = context.Reviews.FirstOrDefault(r => r.RId == reviewId && r.UId == userId);
+            var review = _context.Reviews.FirstOrDefault(r => r.RId == reviewId && r.UId == userId);
 
             if (review == null)
             {
@@ -50,7 +55,7 @@ namespace E_Commerce_System_API.Controllers
             review.Comment = newComment;
             review.Rating = newRating;
 
-            context.SaveChanges();
+            _context.SaveChanges();
             return Ok("Review updated successfully.");
         }
 

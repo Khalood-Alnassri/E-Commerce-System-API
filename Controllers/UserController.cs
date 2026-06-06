@@ -15,7 +15,12 @@ namespace E_Commerce_System_API.Controllers
     [Route("api/User")]
     public class UserController : ControllerBase
     {
-        ApplicationDbContext context = new ApplicationDbContext();
+        public ApplicationDbContext _context;
+
+        public UserController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         // function to regist user (add user)
         [HttpPost("Register")]
@@ -31,8 +36,8 @@ namespace E_Commerce_System_API.Controllers
             user.Role = "User";
             user.IsActive = true;
 
-            context.Users.Add(user);
-            context.SaveChanges();
+            _context.Users.Add(user);
+            _context.SaveChanges();
             return Ok("Register successfully, with ID: " + user.UId);
         }
 
@@ -50,7 +55,7 @@ namespace E_Commerce_System_API.Controllers
                 return BadRequest("Password is required.");
             }
 
-            var user = context.Users.FirstOrDefault(u => u.Email.ToLower() == email.ToLower());
+            var user = _context.Users.FirstOrDefault(u => u.Email.ToLower() == email.ToLower());
 
             string hashedPassword = HashPassword(password);
 
@@ -85,7 +90,7 @@ namespace E_Commerce_System_API.Controllers
                 return NotFound("You should login frist!");
             }
 
-            var user = context.Users.Find(userId);
+            var user = _context.Users.Find(userId);
             if (user == null)
             {
                 return NotFound("User not found.");
@@ -116,7 +121,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // check user exists
-            var user = context.Users.Find(userId);
+            var user = _context.Users.Find(userId);
 
             if (user == null)
             {
@@ -130,7 +135,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // get all users
-            var users = context.Users.ToList();
+            var users = _context.Users.ToList();
 
             // convert to DTO
             var usersDTO = new List<GetUserInfoDTO>();
@@ -166,7 +171,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // check user exists
-            var user = context.Users.Find(userId);
+            var user = _context.Users.Find(userId);
             if (user == null)
             {
                 return Unauthorized("User not found.");
@@ -178,12 +183,12 @@ namespace E_Commerce_System_API.Controllers
                 return Forbid("You do not have permission to perform this action.");
             }
 
-            var users = context.Users.FirstOrDefault(a => a.UId == userID);
+            var users = _context.Users.FirstOrDefault(a => a.UId == userID);
 
             if (users != null)
             {
                 users.IsActive = status;
-                context.SaveChanges();
+                _context.SaveChanges();
                 return Ok("User status updated successfully.");
             }
             return NotFound("User not found.");

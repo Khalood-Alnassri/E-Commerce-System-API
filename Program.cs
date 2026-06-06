@@ -1,4 +1,7 @@
 
+using E_Commerce_System;
+using Microsoft.EntityFrameworkCore;
+
 namespace E_Commerce_System_API
 {
     public class Program
@@ -9,6 +12,10 @@ namespace E_Commerce_System_API
 
             // Services
             builder.Services.AddControllers();
+
+            //register services for dependency injection
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();

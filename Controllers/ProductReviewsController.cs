@@ -10,7 +10,12 @@ namespace E_Commerce_System_API.Controllers
     [Route("api/ProductReviews")]
     public class ProductReviewsController : ControllerBase
     {
-        ApplicationDbContext context = new ApplicationDbContext();
+        public ApplicationDbContext _context;
+
+        public ProductReviewsController (ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         // function to add review 
         [HttpGet("AddReview")]
@@ -24,21 +29,21 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // search for Product
-            Product product = context.Products.Include(p => p.Reviews)
+            Product product = _context.Products.Include(p => p.Reviews)
                                               .FirstOrDefault(p => p.PId == productId);
             if (product == null)
             {
                 return NotFound("Product not found.");
             }
 
-            context.Reviews.Add(r);
-            context.SaveChanges();
+            _context.Reviews.Add(r);
+            _context.SaveChanges();
 
             // recalculate overall rating
             product.OverallRating = (decimal)product.Reviews
                                                     .Append(r)
                                                     .Average(r => r.Rating);
-            context.SaveChanges();
+            _context.SaveChanges();
 
             return Ok("Review added successfully.");
         }
@@ -55,7 +60,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // search all reviews for the user 
-            var myReviews = context.Reviews.Where(r => r.UId == userId).ToList();
+            var myReviews = _context.Reviews.Where(r => r.UId == userId).ToList();
 
             if (!myReviews.Any())
             {
@@ -63,7 +68,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // take review id from the user
-            var review = context.Reviews.FirstOrDefault(r => r.RId == reviewId && r.UId == userId);
+            var review = _context.Reviews.FirstOrDefault(r => r.RId == reviewId && r.UId == userId);
 
             if (review == null)
             {
@@ -71,7 +76,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // search product with reviews
-            var product = context.Products
+            var product = _context.Products
                                  .Include(p => p.Reviews)
                                  .FirstOrDefault(p => p.PId == review.PId);
 
@@ -81,8 +86,8 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // delete review 
-            context.Reviews.Remove(review);
-            context.SaveChanges();
+            _context.Reviews.Remove(review);
+            _context.SaveChanges();
 
             // recalculate overall rating
             if (product.Reviews.Count > 1)
@@ -97,7 +102,7 @@ namespace E_Commerce_System_API.Controllers
                 product.OverallRating = 0;
             }
 
-            context.SaveChanges();
+            _context.SaveChanges();
 
             return Ok("Review deleted successfully.");
         }
@@ -107,7 +112,7 @@ namespace E_Commerce_System_API.Controllers
         public IActionResult ProductReviews(int productId)
         {
             // check product exists
-            var product = context.Products
+            var product = _context.Products
                                  .FirstOrDefault(p => p.PId == productId);
 
             if (product == null)
@@ -115,7 +120,7 @@ namespace E_Commerce_System_API.Controllers
                 return NotFound("Product not found.");
             }
 
-            var reviews = context.Reviews.Where(r => r.PId == productId)
+            var reviews = _context.Reviews.Where(r => r.PId == productId)
                                          .Select(r => new { r.Rating, r.Comment, r.ReviewDate })
                                          .ToList();
             if (!reviews.Any())

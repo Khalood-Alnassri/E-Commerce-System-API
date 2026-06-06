@@ -1,4 +1,5 @@
 ﻿using E_Commerce_System;
+using E_Commerce_System_API.DTOs;
 using E_Commerce_System_API.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,11 +9,16 @@ namespace E_Commerce_System_API.Controllers
     [Route("api/Product")]
     public class ProductController : ControllerBase
     {
-        ApplicationDbContext context = new ApplicationDbContext();
+        public ApplicationDbContext _context;
+
+        public ProductController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         // function to Add a new product
         [HttpPost("AddProduct")]
-        public IActionResult AddProduct(Product p)
+        public IActionResult AddProduct(AddProductDTO productDto)
         {
             int? userId = HttpContext.Session.GetInt32("UserId");
             string role = HttpContext.Session.GetString("Role");
@@ -24,7 +30,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // check user exists
-            var user = context.Users.Find(userId);
+            var user = _context.Users.Find(userId);
 
             if (user == null)
             {
@@ -37,14 +43,22 @@ namespace E_Commerce_System_API.Controllers
                 return Forbid("You do not have permission to perform this action.");
             }
 
-            context.Products.Add(p);
-            context.SaveChanges();
+            var proDto = new Product
+            {
+                PName = productDto.PName,
+                Description = productDto.Description,
+                Price = productDto.Price,
+                Stock = productDto.Stock
+            };
+
+            _context.Products.Add(proDto);
+            _context.SaveChanges();
             return Ok("Product added successfully.");
         }
 
         // function to Update product details
         [HttpPut("UpdateProduct")]
-        public IActionResult UpdateProduct(Product p)
+        public IActionResult UpdateProduct(AddProductDTO proDTO)
         {
             int? userId = HttpContext.Session.GetInt32("UserId");
             string role = HttpContext.Session.GetString("Role");
@@ -55,7 +69,7 @@ namespace E_Commerce_System_API.Controllers
                 return Unauthorized("Please login first.");
             }
 
-            var user = context.Users.Find(userId);
+            var user = _context.Users.Find(userId);
 
             if (user == null || role != "Admin")
             {
@@ -63,7 +77,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // check product exists
-            var product = context.Products.Find(p.PId);
+            var product = _context.Products.Find(proDTO.);
 
             if (product == null)
             {
@@ -72,13 +86,13 @@ namespace E_Commerce_System_API.Controllers
 
             // update only required fields
 
-            product.PName = p.PName;
-            product.Description = p.Description;
-            product.Price = p.Price;
-            product.Stock = p.Stock;
+            product.PName = proDTO.PName;
+            product.Description = proDTO.Description;
+            product.Price = proDTO.Price;
+            product.Stock = proDTO.Stock;
 
-            context.SaveChanges();
-            return Ok("Product update successfully.");
+            _context.SaveChanges();
+            return Ok("Product update successfully, with ID: " + product.PId);
         }
 
         // function to Get a list of products
@@ -87,7 +101,7 @@ namespace E_Commerce_System_API.Controllers
         {
             int pageSize = 10; // each page have 10 products
 
-            var products = context.Products.Select(p => new { p.PName, p.Stock, p.Price })
+            var products = _context.Products.Select(p => new { p.PName, p.Stock, p.Price })
                                            .OrderBy(p => p.PName)
                                            .Skip((page - 1) * pageSize)
                                            .Take(pageSize).ToList();
@@ -104,9 +118,9 @@ namespace E_Commerce_System_API.Controllers
         [HttpGet("ProductDetail")]
         public IActionResult ProductDetail(int proId)
         {
-            var prod = context.Products.ToList();
+            var prod = _context.Products.ToList();
 
-            var product = context.Products.Select(p => new { p.PId, p.PName, p.Price, p.Description, p.Stock })
+            var product = _context.Products.Select(p => new { p.PId, p.PName, p.Price, p.Description, p.Stock })
                                           .FirstOrDefault(p => p.PId == proId);
 
             if (product == null)

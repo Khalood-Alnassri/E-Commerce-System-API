@@ -9,7 +9,12 @@ namespace E_Commerce_System_API.Controllers
     [Route("api/Order")]
     public class OrderController : ControllerBase 
     {
-        ApplicationDbContext context = new ApplicationDbContext();
+        public ApplicationDbContext _context;
+
+        public OrderController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         // function to Get all orders for a user
         [HttpGet("GetUserOrders")]
@@ -22,7 +27,7 @@ namespace E_Commerce_System_API.Controllers
                 return Unauthorized("Please login first.");
             }
 
-            var orders = context.Orders.Where(o => o.UId == userId)
+            var orders = _context.Orders.Where(o => o.UId == userId)
                                     .OrderByDescending(o => o.OrderDate)
                                     .ToList();
             if (!orders.Any())
@@ -42,7 +47,7 @@ namespace E_Commerce_System_API.Controllers
         [HttpGet("OrderDetail")]
         public IActionResult OrderDetail(int orderID)
         {
-            var orders = context.Orders.Include(o => o.OrderProducts)
+            var orders = _context.Orders.Include(o => o.OrderProducts)
                                         .ThenInclude(p => p.Product)
                                         .FirstOrDefault(o => o.OId == orderID);
 

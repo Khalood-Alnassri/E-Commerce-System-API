@@ -8,7 +8,12 @@ namespace E_Commerce_System_API.Controllers
     [Route("api/OrderProduct")]
     public class OrderProductController : ControllerBase
     {
-        ApplicationDbContext context = new ApplicationDbContext();
+        public ApplicationDbContext _context;
+
+        public OrderProductController (ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         // function to Place a new order
         [HttpPost("PlaceNewOrder")]
@@ -22,7 +27,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // search for product
-            var product = context.Products.FirstOrDefault(p => p.PId == productId);
+            var product = _context.Products.FirstOrDefault(p => p.PId == productId);
 
             if (product == null)
             {
@@ -48,8 +53,8 @@ namespace E_Commerce_System_API.Controllers
                 OrderDate = DateTime.Now
             };
 
-            context.Orders.Add(order);
-            context.SaveChanges();
+            _context.Orders.Add(order);
+            _context.SaveChanges();
 
             // create relation
             var orderProduct = new OrderProduct
@@ -59,7 +64,7 @@ namespace E_Commerce_System_API.Controllers
                 Quantity = qty
             };
 
-            context.OrderProducts.Add(orderProduct); // add order in OrderProducts table
+            _context.OrderProducts.Add(orderProduct); // add order in OrderProducts table
 
             // calculate the total amount 
             order.TotalAmount = order.OrderProducts
@@ -68,7 +73,7 @@ namespace E_Commerce_System_API.Controllers
             // reduce product stock
             product.Stock -= qty;
 
-            context.SaveChanges();
+            _context.SaveChanges();
             return Ok("Order placed successfully.");
 
         }
