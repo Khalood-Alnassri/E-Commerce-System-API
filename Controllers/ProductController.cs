@@ -58,7 +58,7 @@ namespace E_Commerce_System_API.Controllers
 
         // function to Update product details
         [HttpPut("UpdateProduct")]
-        public IActionResult UpdateProduct(AddProductDTO proDTO)
+        public IActionResult UpdateProduct(UpdateProductDTO proDTO , int p)
         {
             int? userId = HttpContext.Session.GetInt32("UserId");
             string role = HttpContext.Session.GetString("Role");
@@ -77,7 +77,7 @@ namespace E_Commerce_System_API.Controllers
             }
 
             // check product exists
-            var product = _context.Products.Find(proDTO.);
+            var product = _context.Products.Find(p);
 
             if (product == null)
             {
@@ -97,11 +97,15 @@ namespace E_Commerce_System_API.Controllers
 
         // function to Get a list of products
         [HttpGet("ListOfProducts")]
-        public IActionResult ListOfProducts(int page = 1)
+        public IActionResult ListOfProducts(ListOfProductsDTO productsDTO, int page = 1)
         {
             int pageSize = 10; // each page have 10 products
 
-            var products = _context.Products.Select(p => new { p.PName, p.Stock, p.Price })
+            var products = _context.Products.Select(p => new ListOfProductsDTO
+                                            { PName = productsDTO.PName,
+                                              Stock = productsDTO.Stock,
+                                              Price = productsDTO.Price
+                                            })
                                            .OrderBy(p => p.PName)
                                            .Skip((page - 1) * pageSize)
                                            .Take(pageSize).ToList();
@@ -116,12 +120,11 @@ namespace E_Commerce_System_API.Controllers
 
         // function to Get product details by ID
         [HttpGet("ProductDetail")]
-        public IActionResult ProductDetail(int proId)
+        public IActionResult ProductDetail(ProductDetailsDTO proDTO)
         {
             var prod = _context.Products.ToList();
 
-            var product = _context.Products.Select(p => new { p.PId, p.PName, p.Price, p.Description, p.Stock })
-                                          .FirstOrDefault(p => p.PId == proId);
+            var product = _context.Products.FirstOrDefault(p => p.PId == proDTO.PId);
 
             if (product == null)
             {

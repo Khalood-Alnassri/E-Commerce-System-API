@@ -1,4 +1,5 @@
 ﻿using E_Commerce_System;
+using E_Commerce_System_API.DTOs;
 using E_Commerce_System_API.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,21 +18,13 @@ namespace E_Commerce_System_API.Controllers
 
         // function to update review
         [HttpPut("UpdateReview")]
-        public IActionResult UpdateReview(int reviewId, string newComment, int newRating)
+        public IActionResult UpdateReview(int reviewId, UpdateReviewDTO reviewDTO)
         {
             int? userId = HttpContext.Session.GetInt32("UserId");
 
             if (userId == null)
             {
                 return Unauthorized("Please login first.");
-            }
-
-            // search all reviews for the user 
-            var myReviews = _context.Reviews.Where(r => r.UId == userId).ToList();
-
-            if (!myReviews.Any())
-            {
-                return NotFound("No reviews found.");
             }
 
             // take review id from the user
@@ -42,18 +35,15 @@ namespace E_Commerce_System_API.Controllers
                 return NotFound("Review not found.");
             }
 
-            if (string.IsNullOrWhiteSpace(newComment))
+            if (reviewDTO.Rating.HasValue)
             {
-                return BadRequest("Comment is required.");
+                review.Rating = reviewDTO.Rating.Value;
             }
 
-            if (newRating < 1 || newRating > 5)
+            if (!string.IsNullOrEmpty(reviewDTO.Comment))
             {
-                return BadRequest("Rating must be between 1 and 5.");
+                review.Comment = reviewDTO.Comment;
             }
-
-            review.Comment = newComment;
-            review.Rating = newRating;
 
             _context.SaveChanges();
             return Ok("Review updated successfully.");

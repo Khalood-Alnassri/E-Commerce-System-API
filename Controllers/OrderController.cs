@@ -1,4 +1,5 @@
 ﻿using E_Commerce_System;
+using E_Commerce_System_API.DTOs;
 using E_Commerce_System_API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,20 +28,23 @@ namespace E_Commerce_System_API.Controllers
                 return Unauthorized("Please login first.");
             }
 
-            var orders = _context.Orders.Where(o => o.UId == userId)
-                                    .OrderByDescending(o => o.OrderDate)
-                                    .ToList();
+            var orders = _context.Orders
+                                 .Where(o => o.UId == userId)
+                                 .OrderByDescending(o => o.OrderDate)
+                                 .Select(o => new GetOrdersDTO
+                                               {
+                                                  OId = o.OId,
+                                                  OrderDate = o.OrderDate,
+                                                  TotalAmount = o.TotalAmount
+                                               })
+                                 .ToList();
+
             if (!orders.Any())
             {
                 return NotFound("No orders yet.");
             }
 
-            for (int i = 0; i < orders.Count; i++)
-            {
-                return Ok(orders[i]);
-            }
-
-            return BadRequest();
+            return Ok(orders);
         }
 
         // function to get Order Detail
@@ -49,7 +53,22 @@ namespace E_Commerce_System_API.Controllers
         {
             var orders = _context.Orders.Include(o => o.OrderProducts)
                                         .ThenInclude(p => p.Product)
-                                        .FirstOrDefault(o => o.OId == orderID);
+                                        .Where(o => o.OId == orderID)
+                                        .Select(o => new OrderDetailsDTO
+                                        {
+                                            OId = o.OId,
+                                            OrderDate = o.OrderDate,
+                                            TotalAmount = o.TotalAmount,
+                                            Products = o.OrderProducts
+                                                        .Select(op => new OrderProductsDetailsDTO
+                                                        {
+                                                                     PName = op.Product.PName,
+                                                                     Quantity = op.Quantity,
+                                                                     Price = op.Product.Price
+                                                                  })
+                                                        .ToList()
+                                        })
+                                        .FirstOrDefault();
 
             if (orders == null)
             {

@@ -1,4 +1,5 @@
 ﻿using E_Commerce_System;
+using E_Commerce_System_API.DTOs;
 using E_Commerce_System_API.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -18,8 +19,8 @@ namespace E_Commerce_System_API.Controllers
         }
 
         // function to add review 
-        [HttpGet("AddReview")]
-        public IActionResult AddReview(Review r, int productId)
+        [HttpPost("AddReview")]
+        public IActionResult AddReview(AddReviewDTO reviewDTO)
         {
             int? userId = HttpContext.Session.GetInt32("UserId");
 
@@ -28,20 +29,36 @@ namespace E_Commerce_System_API.Controllers
                 return Unauthorized("Please login first.");
             }
 
+
+            // validate review data
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             // search for Product
             Product product = _context.Products.Include(p => p.Reviews)
-                                              .FirstOrDefault(p => p.PId == productId);
+                                              .FirstOrDefault(p => p.PId == reviewDTO.PId);
             if (product == null)
             {
                 return NotFound("Product not found.");
             }
 
-            _context.Reviews.Add(r);
+            Review review = new Review
+            {
+                Rating = reviewDTO.Rating,
+                Comment = reviewDTO.Comment,
+                ReviewDate = DateTime.Now,
+                PId = reviewDTO.PId,
+                UId = userId.Value
+            };
+
+            _context.Reviews.Add(review);
             _context.SaveChanges();
 
             // recalculate overall rating
             product.OverallRating = (decimal)product.Reviews
-                                                    .Append(r)
+                                                    .Append(review)
                                                     .Average(r => r.Rating);
             _context.SaveChanges();
 
@@ -121,7 +138,12 @@ namespace E_Commerce_System_API.Controllers
             }
 
             var reviews = _context.Reviews.Where(r => r.PId == productId)
-                                         .Select(r => new { r.Rating, r.Comment, r.ReviewDate })
+                                         .Select(r => new ProductReviewsDTO
+                                         {
+                                             Rating = r.Rating,
+                                             Comment = r.Comment,
+                                             ReviewDate = r.ReviewDate
+                                         })
                                          .ToList();
             if (!reviews.Any())
             {

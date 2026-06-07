@@ -1,4 +1,5 @@
 ﻿using E_Commerce_System;
+using E_Commerce_System_API.DTOs;
 using E_Commerce_System_API.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,7 +18,7 @@ namespace E_Commerce_System_API.Controllers
 
         // function to Place a new order
         [HttpPost("PlaceNewOrder")]
-        public ActionResult PlaceNewOrder(int productId, int qty)
+        public ActionResult PlaceNewOrder(CreateOrderDTO orderDTO)
         {
             int? userId = HttpContext.Session.GetInt32("UserId");
 
@@ -26,25 +27,12 @@ namespace E_Commerce_System_API.Controllers
                 return Unauthorized("Please login first.");
             }
 
-            // search for product
-            var product = _context.Products.FirstOrDefault(p => p.PId == productId);
-
-            if (product == null)
+            if (orderDTO.Items == null || !orderDTO.Items.Any())
             {
-                return BadRequest("Invalid product.");
+                return BadRequest("Order must contain at least one item.");
             }
 
-            // check quantity
-            if (qty <= 0)
-            {
-                return BadRequest("Quantity must be greater than zero.");
-            } 
-
-            // check product stock
-            if (product.Stock < qty)
-            {
-                return BadRequest($"Cannot place order. Only {product.Stock} items available in stock.");
-            }
+            decimal totalAmount = 0;
 
             // create order
             var order = new Order
@@ -56,25 +44,46 @@ namespace E_Commerce_System_API.Controllers
             _context.Orders.Add(order);
             _context.SaveChanges();
 
-            // create relation
-            var orderProduct = new OrderProduct
+            foreach (var itemsDTO in orderDTO.Items)
             {
-                OId = order.OId,
-                PId = product.PId,
-                Quantity = qty
-            };
+                // search for product
+                var product = _context.Products.FirstOrDefault(p => p.PId == itemsDTO.ProductId);
 
-            _context.OrderProducts.Add(orderProduct); // add order in OrderProducts table
+                if (product == null)
+                {
+                    return BadRequest("Invalid product.");
+                }
 
-            // calculate the total amount 
-            order.TotalAmount = order.OrderProducts
-                     .Sum(op => op.Quantity * op.Product.Price);
+                // check stock availability
+                if (product.Stock < itemsDTO.Quantity)
+                {
+                    return BadRequest("Onle " + product.Stock + " items available.");
+                }
 
-            // reduce product stock
-            product.Stock -= qty;
+                var orderProduct = new OrderProduct
+                {
+                    OId = order.OId,
+                    PId = product.PId,
+                    Quantity = itemsDTO.Quantity
+                };
 
+                _context.OrderProducts.Add(orderProduct); // add order in OrderProducts table
+
+                // calculate the total amount 
+                totalAmount += itemsDTO.Quantity * product.Price;
+
+                // reduce product stock
+                product.Stock -= itemsDTO.Quantity;
+            }
+
+            order .TotalAmount = totalAmount; // update total amount in order table
             _context.SaveChanges();
-            return Ok("Order placed successfully.");
+            return Ok( new
+            {
+                Message = "Order placed successfully.",
+                orderId = order.OId,
+                TotalAmount = totalAmount
+            });
 
         }
     }
