@@ -1,90 +1,139 @@
 ﻿using E_Commerce_System;
 using E_Commerce_System_API.DTOs;
 using E_Commerce_System_API.Models;
+using E_Commerce_System_API.Serviece;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace E_Commerce_System_API.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/OrderProduct")]
     public class OrderProductController : ControllerBase
     {
-        public ApplicationDbContext _context;
+        private readonly ApplicationDbContext _context;
 
-        public OrderProductController (ApplicationDbContext context)
+        private readonly LoggingService _loggingService;
+
+        public OrderProductController(ApplicationDbContext context, LoggingService logging)
         {
             _context = context;
+            _loggingService = logging;
         }
 
         // function to Place a new order
         [HttpPost("PlaceNewOrder")]
         public ActionResult PlaceNewOrder(CreateOrderDTO orderDTO)
         {
-            int? userId = HttpContext.Session.GetInt32("UserId");
+            var userClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            if (userId == null)
+            if (string.IsNullOrEmpty(userClaim))
             {
+                _loggingService.LogWarning("Unauthorized access attempt to place an order.");
                 return Unauthorized("Please login first.");
             }
 
+            int userId = int.Parse(userClaim);
             if (orderDTO.Items == null || !orderDTO.Items.Any())
             {
+                _loggingService.LogWarning("User " + userId + " attempted to place an order with no items.");
                 return BadRequest("Order must contain at least one item.");
             }
 
-            decimal totalAmount = 0;
+            //merge duplicate products
+            var items = orderDTO.Items
+                   .GroupBy(i => i.ProductId)
+                   .Select(g => new
+                   {
+                       ProductId = g.Key,
+                       Quantity = g.Sum(x => x.Quantity)
+                   })
+                   .ToList();
 
-            // create order
-            var order = new Order
+            using var transaction = _context.Database.BeginTransaction();
+
+            try
             {
-                UId = userId.Value,
-                OrderDate = DateTime.Now
-            };
+                decimal totalAmount = 0;
 
-            _context.Orders.Add(order);
-            _context.SaveChanges();
+                var validatedProducts = new List<(Product Product, int Quantity)>();
 
-            foreach (var itemsDTO in orderDTO.Items)
-            {
-                // search for product
-                var product = _context.Products.FirstOrDefault(p => p.PId == itemsDTO.ProductId);
-
-                if (product == null)
+                foreach (var item in items)
                 {
-                    return BadRequest("Invalid product.");
+                    if (item.Quantity <= 0)
+                    {
+                        _loggingService.LogWarning("User " + userId + " attempted to place an order with invalid quantity for product " + item.ProductId);
+                        return BadRequest("Quantity must be greater than zero.");
+                    }
+
+                    var product = _context.Products
+                                          .Find(item.ProductId);
+
+                    if (product == null)
+                    {
+                        _loggingService.LogWarning("Product " + item.ProductId + " not found.");
+                        return BadRequest("Invalid product.");
+                    }
+
+                    if (product.Stock < item.Quantity)
+                    {
+                        return BadRequest("Only " + product.Stock + " available for " + product.PName);
+                    }
+
+                    validatedProducts.Add((product, item.Quantity));
                 }
 
-                // check stock availability
-                if (product.Stock < itemsDTO.Quantity)
+                // create order
+                var order = new Order
                 {
-                    return BadRequest("Onle " + product.Stock + " items available.");
-                }
-
-                var orderProduct = new OrderProduct
-                {
-                    OId = order.OId,
-                    PId = product.PId,
-                    Quantity = itemsDTO.Quantity
+                    UId = userId,
+                    OrderDate = DateTime.Now
                 };
 
-                _context.OrderProducts.Add(orderProduct); // add order in OrderProducts table
+                _context.Orders.Add(order);
+                _context.SaveChanges();
 
-                // calculate the total amount 
-                totalAmount += itemsDTO.Quantity * product.Price;
+                // create order-product relationship
+                foreach (var item in validatedProducts)
+                {
+                    var orderProduct = new OrderProduct
+                    {
+                        OId = order.OId,
+                        PId = item.Product.PId,
+                        Quantity = item.Quantity
+                    };
 
-                // reduce product stock
-                product.Stock -= itemsDTO.Quantity;
+                    _context.OrderProducts.Add(orderProduct); // add order in OrderProducts table
+
+                    // calculate the total amount 
+                    totalAmount += item.Quantity * item.Product.Price;
+
+                    // reduce product stock
+                    item.Product.Stock -= item.Quantity;
+                }
+
+                order.TotalAmount = totalAmount; // update total amount in order table
+                _context.SaveChanges();
+
+                transaction.Commit();
+
+                _loggingService.LogInfo("User " + userId + " placed an order with ID " + order.OId + " and total amount " + totalAmount);
+                return Ok(new
+                {
+                    Message = "Order placed successfully.",
+                    orderId = order.OId,
+                    TotalAmount = totalAmount
+                });
             }
 
-            order .TotalAmount = totalAmount; // update total amount in order table
-            _context.SaveChanges();
-            return Ok( new
+            catch (Exception ex)
             {
-                Message = "Order placed successfully.",
-                orderId = order.OId,
-                TotalAmount = totalAmount
-            });
-
+                transaction.Rollback();
+                _loggingService.LogError("User " + userId + " failed to place an order. Error: " + ex.Message);
+                return StatusCode(500, "An error occurred while placing the order.");
+            }
         }
     }
 }

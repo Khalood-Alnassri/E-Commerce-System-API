@@ -1,35 +1,37 @@
 ﻿using E_Commerce_System;
 using E_Commerce_System_API.DTOs;
-using E_Commerce_System_API.Models;
+using E_Commerce_System_API.Serviece;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace E_Commerce_System_API.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/Order")]
     public class OrderController : ControllerBase 
     {
-        public ApplicationDbContext _context;
+        private readonly ApplicationDbContext _context;
 
-        public OrderController(ApplicationDbContext context)
+        private readonly LoggingService _loggingService;
+
+        public OrderController(ApplicationDbContext context, LoggingService logging)
         {
             _context = context;
+            _loggingService = logging;
         }
+
 
         // function to Get all orders for a user
         [HttpGet("GetUserOrders")]
         public IActionResult GetUserOrders()
         {
-            int? userId = HttpContext.Session.GetInt32("UserId");
-
-            if (userId == null)
-            {
-                return Unauthorized("Please login first.");
-            }
+            int id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
 
             var orders = _context.Orders
-                                 .Where(o => o.UId == userId)
+                                 .Where(o => o.UId == id)
                                  .OrderByDescending(o => o.OrderDate)
                                  .Select(o => new GetOrdersDTO
                                                {
@@ -41,7 +43,8 @@ namespace E_Commerce_System_API.Controllers
 
             if (!orders.Any())
             {
-                return NotFound("No orders yet.");
+                _loggingService.LogInfo("User with ID " + id + " has no orders.");
+                return Ok(new List<GetOrdersDTO>()); // Return an empty list instead of NotFound
             }
 
             return Ok(orders);
@@ -51,9 +54,11 @@ namespace E_Commerce_System_API.Controllers
         [HttpGet("OrderDetail")]
         public IActionResult OrderDetail(int orderID)
         {
-            var orders = _context.Orders.Include(o => o.OrderProducts)
+            int id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+
+            var order = _context.Orders.Include(o => o.OrderProducts)
                                         .ThenInclude(p => p.Product)
-                                        .Where(o => o.OId == orderID)
+                                        .Where(o => o.OId == orderID && o.UId == id)
                                         .Select(o => new OrderDetailsDTO
                                         {
                                             OId = o.OId,
@@ -70,12 +75,13 @@ namespace E_Commerce_System_API.Controllers
                                         })
                                         .FirstOrDefault();
 
-            if (orders == null)
+            if (order == null)
             {
-                return NotFound("order not found");
+                _loggingService.LogInfo("Order with ID " + orderID + " not found.");
+                return Ok(new List<GetOrdersDTO>()); // Return an empty list instead of NotFound
             }
              
-            return Ok(orders);
+            return Ok(order);
         }
 
     }
