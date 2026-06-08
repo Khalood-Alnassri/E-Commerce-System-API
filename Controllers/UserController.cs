@@ -37,12 +37,9 @@ namespace E_Commerce_System_API.Controllers
         public IActionResult Register(UserRegisterDTO registerDto)
         {
             // check if email already exists
-            var existingUser = _context.Users
-                           .FirstOrDefault(u => u.Email == registerDto.Email);
-
-            if (existingUser != null)
+            if (_context.Users.Any(u => u.Email == registerDto.Email))
             {
-                return BadRequest("Email already exists.");
+                return BadRequest("Email already in use.");
             }
 
             User user = new User

@@ -29,25 +29,12 @@ namespace E_Commerce_System_API.Controllers
         [HttpPost("AddProduct")]
         public IActionResult AddProduct(AddProductDTO productDto)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            var role = User.FindFirst(ClaimTypes.Role)?.Value;
-
-            // check login
-            if (userId == null)
+            if (!ModelState.IsValid)
             {
-                _loggingService.LogWarning("Unauthorized access attempt to add product.");
-                return Unauthorized("Please login first.");
+                return BadRequest(ModelState);
             }
 
-            // check admin role
-            if (role != "Admin")
-            {
-                _loggingService.LogError("You do not have permission to perform this action.");
-                return Forbid("You do not have permission to perform this action.");
-            }
-
-            var proDto = new Product
+            var product = new Product
             {
                 PName = productDto.PName,
                 Description = productDto.Description,
@@ -55,10 +42,10 @@ namespace E_Commerce_System_API.Controllers
                 Stock = productDto.Stock
             };
 
-            _context.Products.Add(proDto);
+            _context.Products.Add(product);
             _context.SaveChanges();
 
-            _loggingService.LogInfo("Product added successfully with ID: " + proDto.PId);
+            _loggingService.LogInfo("Product added successfully with ID: " + product.PId);
             return Ok("Product added successfully.");
         }
 
@@ -67,32 +54,34 @@ namespace E_Commerce_System_API.Controllers
         [HttpPut("UpdateProduct")]
         public IActionResult UpdateProduct(UpdateProductDTO proDTO , int proId)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            var role = User.FindFirst(ClaimTypes.Role)?.Value;
-
-            // check login
-            if (userId == null)
-            {
-                _loggingService.LogWarning("Unauthorized access attempt to update product.");
-                return Unauthorized("Please login first.");
-            }
-
-            int id = int.Parse(userId);
-
             var product = _context.Products.FirstOrDefault(p => p.PId == proId);
 
             if (product == null)
             {
-                _loggingService.LogWarning("Product with ID " + id + " not found.");
+                _loggingService.LogWarning("Product with ID " + proId + " not found.");
                 return NotFound("Product not found.");
             }
 
             // update only required fields
-            product.PName = proDTO.PName;
-            product.Description = proDTO.Description;
-            product.Price = proDTO.Price;
-            product.Stock = proDTO.Stock;
+            if (!string.IsNullOrWhiteSpace(proDTO.PName))
+            {
+                product.PName = proDTO.PName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(proDTO.Description))
+            {
+                product.Description = proDTO.Description;
+            }
+
+            if (proDTO.Price.HasValue)
+            {
+                product.Price = proDTO.Price.Value;
+            }
+
+            if (proDTO.Stock.HasValue)
+            {
+                product.Stock = proDTO.Stock.Value;
+            }
 
             _context.SaveChanges();
             _loggingService.LogInfo("Product with ID " + product.PId + " updated successfully.");
@@ -100,17 +89,21 @@ namespace E_Commerce_System_API.Controllers
         }
 
         // function to Get a list of products
+        [AllowAnonymous]
         [HttpGet("ListOfProducts")]
-        public IActionResult ListOfProducts(int page = 1)
+        public IActionResult ListOfProducts(FilteringProductDTO filtering, int page = 1)
         {
             int pageSize = 10; // each page have 10 products
 
-            var products = _context.Products.Select(p => new ListOfProductsDTO
+            var products = _context.Products.Where(p => (string.IsNullOrWhiteSpace(filtering.PName) || p.PName.Contains(filtering.PName)) &&
+                                                               (!filtering.MinPrice.HasValue || p.Price >= filtering.MinPrice.Value) &&
+                                                               (!filtering.MaxPrice.HasValue || p.Price <= filtering.MaxPrice.Value))
+                                            .OrderBy(p => p.PName)
+                                            .Select(p => new ListOfProductsDTO
                                             { PName = p.PName,
                                               Stock = p.Stock,
                                               Price = p.Price
                                             })
-                                           .OrderBy(p => p.PName)
                                            .Skip((page - 1) * pageSize)
                                            .Take(pageSize)
                                            .ToList();
@@ -125,6 +118,7 @@ namespace E_Commerce_System_API.Controllers
         }
 
         // function to Get product details by ID
+        [Authorize(Roles = "Admin")]
         [HttpGet("ProductDetail")]
         public IActionResult ProductDetail(int proId)
         {

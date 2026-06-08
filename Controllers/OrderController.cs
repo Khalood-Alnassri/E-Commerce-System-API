@@ -78,7 +78,7 @@ namespace E_Commerce_System_API.Controllers
             if (order == null)
             {
                 _loggingService.LogInfo("Order with ID " + orderID + " not found.");
-                return Ok(new List<GetOrdersDTO>()); // Return an empty list instead of NotFound
+                return NotFound(new List<GetOrdersDTO>()); // Return an empty list instead of NotFound
             }
              
             return Ok(order);

@@ -26,8 +26,7 @@ namespace E_Commerce_System_API.Models
         [Range(0, double.MaxValue, ErrorMessage = "Stock must be 0 or Positive value")]
         public int Stock {  get; set; }
 
-        [Required]
-        public decimal OverallRating { get; set; }
+        public decimal OverallRating { get; set; } = 0;
 
         public virtual ICollection<Review>  ? Reviews { get;set; }
 

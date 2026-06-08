@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace E_Commerce_System_API.Controllers
 {
@@ -157,6 +158,7 @@ namespace E_Commerce_System_API.Controllers
             _context.Reviews.Remove(review);
             _context.SaveChanges();
 
+            // recalculate overall rating
             var remainingReviews = _context.Reviews
                                            .Where(r => r.PId == product.PId);
 
@@ -178,7 +180,7 @@ namespace E_Commerce_System_API.Controllers
         // function to Get all reviews for product
         [AllowAnonymous]
         [HttpGet("ProductReviews")]
-        public IActionResult ProductReviews(int productId)
+        public IActionResult ProductReviews(int productId, int page = 1)
         {
             // check product exists
             var product = _context.Products
@@ -189,21 +191,79 @@ namespace E_Commerce_System_API.Controllers
                 return NotFound("Product not found.");
             }
 
+            int pageSize = 10;
+
             var reviews = _context.Reviews.Where(r => r.PId == productId)
-                                         .Select(r => new ProductReviewsDTO
-                                         {
+                                          .OrderByDescending(r => r.ReviewDate)
+                                          .Select(r => new ProductReviewsDTO
+                                          {
                                              Rating = r.Rating,
                                              Comment = r.Comment,
                                              ReviewDate = r.ReviewDate
-                                         })
-                                         .ToList();
+                                          })
+                                          .Skip((page - 1) * pageSize)
+                                          .Take(pageSize)
+                                          .ToList();
             if (!reviews.Any())
             {
                 _loggingService.LogInfo("No reviews found for product " + productId);
-                return NotFound("No reviews found for this product.");
+                return Ok(new List<ProductReviewsDTO>());
             }
+
             _loggingService.LogInfo("Retrieved reviews for product " + productId);
             return Ok(reviews);
+        }
+
+        // function to update review
+        [Authorize]
+        [HttpPut("UpdateReview")]
+        public IActionResult UpdateReview(int reviewId, UpdateReviewDTO reviewDTO)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (userId == null)
+            {
+                _loggingService.LogWarning("Unauthorized review update attempt.");
+                return Unauthorized("Please login first.");
+            }
+
+            if (!int.TryParse(userId, out int id))
+            {
+                return Unauthorized("Invalid user ID.");
+            }
+
+            // take review id from the user
+            var review = _context.Reviews.Include(r => r.Product)
+                                         .FirstOrDefault(r => r.RId == reviewId && r.UId == id);
+
+            if (review == null)
+            {
+                return NotFound("Review not found.");
+            }
+
+            if (reviewDTO.Rating.HasValue)
+            {
+                review.Rating = reviewDTO.Rating.Value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(reviewDTO.Comment))
+            {
+                review.Comment = reviewDTO.Comment;
+            }
+
+            // update review date
+            review.UpdatedDate = DateTime.Now;
+
+            // recalculate overall rating
+            var averageRating = _context.Reviews
+                                .Where(r => r.PId == review.PId)
+                                .Average(r => (decimal?)r.Rating) ?? 0;
+
+            review.Product.OverallRating = averageRating;
+
+            _context.SaveChanges();
+            _loggingService.LogInfo("User " + id + " updated review " + reviewId);
+            return Ok("Review updated successfully.");
         }
 
     }

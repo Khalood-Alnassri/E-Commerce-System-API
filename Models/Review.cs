@@ -21,6 +21,8 @@ namespace E_Commerce_System_API.Models
 
         public DateTime? ReviewDate { get; set; }
 
+        public DateTime? UpdatedDate { get; set; } // New property to track the last update time of the review
+
         [ForeignKey("User")]
         public int UId { get; set; }
         public virtual User User { get; set; }
